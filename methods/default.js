@@ -42,15 +42,15 @@ const flexAlignV = {
   bll: 'last baseline',
 }
 const gridAutoFlow = {
-  'col': 'column',
+  col: 'column',
   'col*': 'column dense',
-  'row': 'row',
+  row: 'row',
   'row*': 'row dense'
 }
 const overflow = {
-  '-': "hidden",
-  '~': "auto",
-  '+': "scroll"
+  h: "hidden",
+  a: "auto",
+  s: "scroll"
 }
 const length = {
   f: '100%',
@@ -71,6 +71,7 @@ const textAlign = {
   mp: 'match-parent'
 }
 const borderStyle = {
+  n: 'none',
   '-': 'solid',
   '.': 'dotted',
   '~': 'wavy',
@@ -83,19 +84,19 @@ const textTransform = {
   c: 'capitalize'
 }
 const userSelect = {
-  '-': 'none',
   '~': 'auto',
+  n: 'none',
   t: 'text',
   a: 'all',
   c: 'contain'
 }
 const visibility = {
-  '-': 'hidden',
-  '+': 'visible',
+  h: 'hidden',
+  v: 'visible',
   c: 'collapse',
 }
 const wordBreak = {
-  '-': 'keep-all',
+  k: 'keep-all',
   w: 'break-word',
   a: 'break-all',
 }
@@ -177,6 +178,8 @@ export const methods = ({
   alI: (s, v) => s.alignItems = flexAlign[v] ?? v,
   alS: (s, v) => s.alignSelf = flexAlign[v] ?? v,
   alT: (s, v) => s.alignTracks = flexAlign[v] ?? v,
+  fll: (s) => s.float = 'left',
+  flr: (s) => s.float = 'right',
   
   // composition
   grid: (s, columns, rows, flow) => {
@@ -213,9 +216,12 @@ export const methods = ({
   mxh: (s, v) => s.maxHeight = length[v] ?? size(v),
   
   // text
+  td: (s, v) => (
+    s.textDecoration = (borderStyle[v] ?? v),
+    s.textDecoration += (s.textDecoration != 'none' ? ' underline' : '')
+  ),
   ta: (s, v) => s.textAlign = textAlign[v] ?? v,
   tc: (s, c) => s.color = color(c),
-  td: (s, v) => s.textDecoration = (borderStyle[v] ?? v) + ' underline',
   tf: (s, f) => s.fontFamily = f,
   tl: (s, v) => s.lineHeight = lineHeight(v),
   ts: (s, v) => s.fontSize = textSize(v),
@@ -311,7 +317,7 @@ export const methods = ({
   
   ...Object.fromEntries([
     ['rot', 'rotate'],
-    ['rotX', 'rotateZ'],
+    ['rotX', 'rotateX'],
     ['rotY', 'rotateY'],
     ['rotZ', 'rotateZ'],
   ].map(([name, prop]) => [name, (s, ...v) =>
