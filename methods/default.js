@@ -41,7 +41,7 @@ const flexAlignV = {
   blf: 'first baseline',
   bll: 'last baseline',
 }
-const gridAutoFlow = {
+const gridFlow = {
   col: 'column',
   'col*': 'column dense',
   row: 'row',
@@ -125,10 +125,10 @@ corners.TL = corners.tl = ['StartStart'];
 corners.TR = corners.tr = ['StartEnd'];
 corners.BL = corners.bl = ['EndStart'];
 corners.BR = corners.br = ['EndEnd'];
-corners.T  = corners.t  = [corners.tl, corners.tr];
-corners.B  = corners.b  = [corners.bl, corners.br];
-corners.L  = corners.l  = [corners.tl, corners.bl];
-corners.R  = corners.r  = [corners.tr, corners.br];
+corners.T  = corners.t  = [...corners.tl, ...corners.tr];
+corners.B  = corners.b  = [...corners.bl, ...corners.br];
+corners.L  = corners.l  = [...corners.tl, ...corners.bl];
+corners.R  = corners.r  = [...corners.tr, ...corners.br];
 
 const some = (args, r) => {
   for (let i = 0; i < args.length; i++) {
@@ -166,7 +166,16 @@ const gridTrack = (size, str) => {
 
 const append = (s, prop, val) => (s[prop] ??= '', s[prop] += val);
 
-export const methods = ({
+const withConfig = func => (cfg) => {
+  const resolve = {};
+  const { unit=[8,'px'] } = cfg;
+  for (const [k, r] of Object.entries(cfg))
+    resolve[k] = typeof r == 'function' ? r : v => r[v] ?? v;
+  resolve.size = v => isNaN(+v) ? v : +v * cfg.unit[0] + cfg.unit[1];
+  return func(resolve);
+}
+
+export const methods = withConfig(({
   size,
   color=v=>v,
   textSize=v=>v,
@@ -186,7 +195,7 @@ export const methods = ({
     s.display = 'grid';
     if (columns) s.gridTemplateColumns = gridTrack(size, columns);
     if (rows) s.gridTemplateRows = gridTrack(size, rows);
-    if (flow) s.gridAutoFlow = some(args, flow);
+    if (flow) s.gridAutoFlow = gridFlow[flow] ?? flow;
   },
   row: (s, ...a) => (
     s.display = 'flex',
@@ -336,4 +345,4 @@ export const methods = ({
   ].map(([name, prop]) => [name, (s, ...v) => (
     append(s, 'transform', prop + '(' + v.map(v => size(v)).join(',') + ')')
   )])),
-});
+}));
