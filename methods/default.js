@@ -142,7 +142,9 @@ const some = (args, r) => {
 const def = (obj, methodName, func) =>
   Object.fromEntries(Object.entries(obj).map(([name, props]) => [
     methodName(name),
-    (s, ...a) => props.forEach((p) => func(p)(s, ...a))
+    function (...a) {
+      return props.map(p => func(p)(...a)).reduce((a, b) => Object.assign(a, b), {});
+    }
   ]));
 
 const gridTrack = (size, str) => {
@@ -164,8 +166,6 @@ const gridTrack = (size, str) => {
   ].join(' ');
 }
 
-const append = (s, prop, val) => (s[prop] ??= '', s[prop] += val);
-
 const withConfig = func => (cfg) => {
   const resolve = {};
   const { unit=[8,'px'] } = cfg;
@@ -183,132 +183,141 @@ export const methods = withConfig(({
   shadow=v=>v
 }) => ({
   // align
-  alC: (s, v) => s.alignContent = flexAlign[v] ?? v,
-  alI: (s, v) => s.alignItems = flexAlign[v] ?? v,
-  alS: (s, v) => s.alignSelf = flexAlign[v] ?? v,
-  alT: (s, v) => s.alignTracks = flexAlign[v] ?? v,
-  fll: (s) => s.float = 'left',
-  flr: (s) => s.float = 'right',
+  alC: (v) => ({ alignContent: flexAlign[v] ?? v }),
+  alI: (v) => ({ alignItems: flexAlign[v] ?? v }),
+  alS: (v) => ({ alignSelf: flexAlign[v] ?? v }),
+  alT: (v) => ({ alignTracks: flexAlign[v] ?? v }),
+  fll: () => ({ float: 'left' }),
+  flr: () => ({ float: 'right' }),
   
   // composition
-  grid: (s, columns, rows, flow) => {
-    s.display = 'grid';
-    if (columns) s.gridTemplateColumns = gridTrack(size, columns);
-    if (rows) s.gridTemplateRows = gridTrack(size, rows);
-    if (flow) s.gridAutoFlow = gridFlow[flow] ?? flow;
+  grid: (columns, rows, flow) => {
+    const res = { display: 'grid' };
+    if (columns) res.gridTemplateColumns = gridTrack(size, columns);
+    if (rows) res.gridTemplateRows = gridTrack(size, rows);
+    if (flow) res.gridAutoFlow = gridFlow[flow] ?? flow;
+    return res;
   },
-  row: (s, ...a) => (
-    s.display = 'flex',
-    s.flexDirection = 'row',
-    s.justifyContent = some(a, flexAlignH),
-    s.alignItems = some(a, flexAlignV)),
-  col: (s, ...a) => (
-    s.display = 'flex',
-    s.flexDirection = 'column',
-    s.alignItems = some(a, flexAlignH),
-    s.justifyContent = some(a, flexAlignV)),
-  span: (s, x, y) => (
-    s.gridRow = x ? `span ${x} / span ${x}` : '',
-    s.gridColumn = y ? `span ${y} / span ${y}` : ''),
-  gap: (s, x, y=x) => (
-    s.columnGap = size(x) ?? x,
-    s.rowGap = size(y) ?? y),
-  rigid: (s) => s.flexShrink = 0,
-  flex: (s, v) => s.flex = v,
+  row: (...a) => ({
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: some(a, flexAlignH),
+    alignItems: some(a, flexAlignV)
+  }),
+  col: (...a) => ({
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: some(a, flexAlignH),
+    justifyContent: some(a, flexAlignV)
+  }),
+  span: (x, y) => ({
+    gridRow: x ? `span ${x} / span ${x}` : '',
+    gridColumn: y ? `span ${y} / span ${y}` : ''
+  }),
+  gap: (x, y=x) => ({
+    columnGap: size(x) ?? x,
+    rowGap: size(y) ?? y
+  }),
+  rigid: () => ({ flexShrink: 0 }),
+  flex: (v) => ({ flex: v }),
   
   // size
-  w: (s, v) => s.width = length[v] ?? size(v),
-  mnw: (s, v) => s.minWidth = length[v] ?? size(v),
-  mxw: (s, v) => s.maxWidth = length[v] ?? size(v),
-  h: (s, v) => s.height = length[v] ?? size(v),
-  mnh: (s, v) => s.minHeight = length[v] ?? size(v),
-  mxh: (s, v) => s.maxHeight = length[v] ?? size(v),
+  w: (v) => ({ width: length[v] ?? size(v) }),
+  mnw: (v) => ({ minWidth: length[v] ?? size(v) }),
+  mxw: (v) => ({ maxWidth: length[v] ?? size(v) }),
+  h: (v) => ({ height: length[v] ?? size(v) }),
+  mnh: (v) => ({ minHeight: length[v] ?? size(v) }),
+  mxh: (v) => ({ maxHeight: length[v] ?? size(v) }),
   
   // text
-  td: (s, v) => (
-    s.textDecoration = (borderStyle[v] ?? v),
-    s.textDecoration += (s.textDecoration != 'none' ? ' underline' : '')
-  ),
-  ta: (s, v) => s.textAlign = textAlign[v] ?? v,
-  tc: (s, c) => s.color = color(c),
-  tf: (s, f) => s.fontFamily = f,
-  tl: (s, v) => s.lineHeight = lineHeight(v),
-  ts: (s, v) => s.fontSize = textSize(v),
-  tt: (s, v) => s.textTransform = textTransform[v] ?? v,
-  tw: (s, v) => s.fontWeight = v,
-  tlc: (s, n) => s.WebkitLineClamp = s.lineClamp = n,
-  tov: (s, v) => s.textOverflow = v,
-  tws: (s, v) => s.whiteSpace = whiteSpace[v] ?? v,
-  twb: (s, v) => s.wordBreak = wordBreak[v] ?? v,
-  tlg: (s, v) => s.letterSpacing = size(v),
-  twg: (s, v) => s.wordSpacing = size(v),
-  tsh: (s, ...a) =>
-    s.textShadow = a.map(v => color(v) ?? size(v) ?? v).join(' '),
+  td: (v) => {
+    const st = borderStyle[v] ?? v;
+    return { textDecoration: st + (st != 'none' ? ' underline' : '') };
+  },
+  ta: (v) => ({ textAlign: textAlign[v] ?? v }),
+  tc: (c) => ({ color: color(c) }),
+  tf: (f) => ({ fontFamily: f }),
+  tl: (v) => ({ lineHeight: lineHeight(v) }),
+  ts: (v) => ({ fontSize: textSize(v) }),
+  tt: (v) => ({ textTransform: textTransform[v] ?? v }),
+  tw: (v) => ({ fontWeight: v }),
+  tlc: (n) => ({ WebkitLineClamp: n, lineClamp: n }),
+  tov: (v) => ({ textOverflow: v }),
+  tws: (v) => ({ whiteSpace: whiteSpace[v] ?? v }),
+  twb: (v) => ({ wordBreak: wordBreak[v] ?? v }),
+  tlg: (v) => ({ letterSpacing: size(v) }),
+  twg: (v) => ({ wordSpacing: size(v) }),
+  tsh: (...a) => ({
+    textShadow: a.map(v => color(v) ?? size(v) ?? v).join(' ')
+  }),
   
   // padding, margin, border, border-radius
-  ...def(sides,   _=>'p'+_,  _=>(s, v) =>
-    s[`padding${_}`] = length[v] ?? size(v)),
-  ...def(sides,   _=>'m'+_,  _=>(s, v) =>
-    s[`margin${_}`] = length[v] ?? size(v)),
-  ...def(corners, _=>'r'+_,  _=>(s, v) => s[`border${_}Radius`] = size(v)),
-  ...def(sides,   _=>'br'+_, _=>(s, ...a) => (
-    s[`border${_}Color`] = some(a, color) ?? 'currentColor',
-    s[`border${_}Width`] = some(a, size) ?? '1px',
-    s[`border${_}Style`] = some(a, borderStyle) ?? 'solid'
-  )),
+  ...def(sides,   _=>'p'+_,  _=>(v) => ({
+    [`padding${_}`]: length[v] ?? size(v)
+  })),
+  ...def(sides,   _=>'m'+_,  _=>(v) => ({
+    [`margin${_}`]: length[v] ?? size(v)
+  })),
+  ...def(corners, _=>'r'+_,  _=>(v) => ({
+    [`border${_}Radius`]: size(v)
+  })),
+  ...def(sides,   _=>'br'+_, _=>(...a) => ({
+    [`border${_}Color`]: some(a, color) ?? 'currentColor',
+    [`border${_}Width`]: some(a, size) ?? '1px',
+    [`border${_}Style`]: some(a, borderStyle) ?? 'solid'
+  })),
   
   // outline
-  ol: (s, ...a) => (
-    s.outlineColor = some(a, color) ?? 'currentColor',
-    s.outlineWidth = some(a, size) ?? '1px',
-    s.outlineOffset = some(a, size) ?? '1px',
-    s.outlineStyle = some(a, borderStyle) ?? 'solid'
-  ),
+  ol: (...a) => ({
+    outlineColor: some(a, color) ?? 'currentColor',
+    outlineWidth: some(a, size) ?? '1px',
+    outlineOffset: some(a, size) ?? '1px',
+    outlineStyle: some(a, borderStyle) ?? 'solid'
+  }),
   
   // ring
-  ring: (s, w='2px', cl="currentColor", of='2px', ofcl='white') =>
-    s.boxShadow = [
+  ring: (w='2px', cl="currentColor", of='2px', ofcl='transparent') => ({
+    boxShadow: [
       `0 0 0 ${size(of)}`, color(ofcl), ',',
       `0 0 0 calc(${size(w)} + ${size(of)})`, color(cl)
-    ].join(' '),
+    ].join(' ')
+  }),
 
   // inset
-  i: (s, v) => s.inset = size(v),
-  it: (s, v) => s.top = size(v),
-  il: (s, v) => s.left = size(v),
-  ib: (s, v) => s.bottom = size(v),
-  ir: (s, v) => s.right = size(v),
+  i: (v) => ({ inset: size(v) }),
+  it: (v) => ({ top: size(v) }),
+  il: (v) => ({ left: size(v) }),
+  ib: (v) => ({ bottom: size(v) }),
+  ir: (v) => ({ right: size(v) }),
 
   // common
-  abs: (s) => s.position = 'absolute',
-  rel: (s) => s.position = 'relative',
-  fix: (s) => s.position = 'fixed',
-  stt: (s) => s.position = 'static',
-  stc: (s) => s.position = 'sticky',
-  d: (s, v) => s.display = display[v] ?? v,
-  z: (s, v) => s.zIndex = v,
-  bg: (s, c) => s.background = color(c),
-  op: (s, v) => s.opacity = v,
-  va: (s, v) => s.verticalAlign = v,
-  sh: (s, v) => s.boxShadow = shadow(v),
-  ov: (s, x, y=x) => (
-    s.overflowX = overflow[x] ?? x,
-    s.overflowY = overflow[y] ?? y
-  ),
-  sel: (s, v) => s.userSelect = userSelect[v] ?? v,
-  vis: (s, v) => s.visibility = visibility[v] ?? v,
-  ptr: (s, v) => (
-    v == '-'
-    ? s.pointerEvents = 'none'
-    : s.cursor = 'pointer'
-  ),
+  abs: () => ({ position: 'absolute' }),
+  rel: () => ({ position: 'relative' }),
+  fix: () => ({ position: 'fixed' }),
+  stt: () => ({ position: 'static' }),
+  stc: () => ({ position: 'sticky' }),
+  d: (v) => ({ display: display[v] ?? v }),
+  z: (v) => ({ zIndex: v }),
+  bg: (c) => ({ background: color(c) }),
+  op: (v) => ({ opacity: v }),
+  va: (v) => ({ verticalAlign: v }),
+  sh: (v) => ({ boxShadow: shadow(v) }),
+  ov: (x, y=x) => ({
+    overflowX: overflow[x] ?? x,
+    overflowY: overflow[y] ?? y
+  }),
+  sel: (v) => ({ userSelect: userSelect[v] ?? v }),
+  vis: (v) => ({ visibility: visibility[v] ?? v }),
+  ptr: (v) => {
+    if (v == 'n') return { pointerEvents: 'none' };
+    else return { cursor: 'pointer' };
+  },
   
   // transform
-  tr3: (s) => s.transformStyle = 'preserve-3d',
-  rot3: (s, x, y, z, r) =>
-    append(s, 'transform',
-      `rotate3d(${x}, ${y}, ${z}, ${isNaN(+r) ? r : r + 'deg'})`
-    ),
+  tr3: () => ({ transformStyle: 'preserve-3d' }),
+  rot3: (x, y, z, r) => ({
+    transform: `rotate3d(${x}, ${y}, ${z}, ${isNaN(+r) ? r : r + 'deg'})`
+  }),
   ...Object.fromEntries([
     ['mat', 'matrix'],
     ['mat3', 'matrix3d'],
@@ -320,20 +329,18 @@ export const methods = withConfig(({
     ['sclX', 'scaleZ'],
     ['sclY', 'scaleY'],
     ['sclZ', 'scaleZ'],
-  ].map(([name, prop]) => [name, (s, ...v) => (
-    append(s, 'transform', prop + '(' + v.join(',') + ')')
-  )])),
+  ].map(([name, prop]) => [name, (...v) => ({
+    transform: prop + '(' + v.join(',') + ')'
+  })])),
   
   ...Object.fromEntries([
     ['rot', 'rotate'],
     ['rotX', 'rotateX'],
     ['rotY', 'rotateY'],
     ['rotZ', 'rotateZ'],
-  ].map(([name, prop]) => [name, (s, ...v) =>
-    append(s, 'transform', prop + '(' +
-      v.map(v => isNaN(+v) ? v : v + 'deg').join(',')
-    + ')')
-  ])),
+  ].map(([name, prop]) => [name, (...v) => ({
+    transform: prop+'('+ v.map(v=>isNaN(+v)?v:v+'deg').join(',') +')'
+  })])),
   
   ...Object.fromEntries([
     ['prs', 'perspective'],
@@ -342,7 +349,7 @@ export const methods = withConfig(({
     ['tslX', 'translateX'],
     ['tslY', 'translateY'],
     ['tslZ', 'translateZ'],
-  ].map(([name, prop]) => [name, (s, ...v) => (
-    append(s, 'transform', prop + '(' + v.map(v => size(v)).join(',') + ')')
-  )])),
+  ].map(([name, prop]) => [name, (...v) => ({
+    transform: prop + '(' + v.map(v => size(v)).join(',') + ')'
+  })])),
 }));
