@@ -55,9 +55,9 @@ const overflow = {
 const length = {
   f: '100%',
   a: 'auto',
+  c: 'fit-content',
   mx: 'max-content',
   mn: 'min-content',
-  ft: 'fit-content',
   fl: 'fill-available',
 }
 const textAlign = {
